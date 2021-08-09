@@ -23,6 +23,12 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
 
     override val context: CoroutineContext = newContext
 
+    override val isActive: Boolean
+        get() = state.get() is CoroutineState.InComplete
+
+    override val isCompleted: Boolean
+        get() = state.get() is CoroutineState.Complete<*>
+
     init {
         state.set(CoroutineState.InComplete())
     }
@@ -50,7 +56,7 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
         }
     }
 
-    protected fun doOnCompleted(block: (Result<T>) -> Unit): Disposable {
+    private fun doOnCompleted(block: (Result<T>) -> Unit): Disposable {
         // 把 disposable 和 job 建立联系
         val disposable = CompletionHandlerDisposable(this, block)
         // 判断当前job状态

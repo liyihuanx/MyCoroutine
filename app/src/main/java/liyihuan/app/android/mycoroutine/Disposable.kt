@@ -2,7 +2,7 @@ package liyihuan.app.android.mycoroutine
 
 /**
  * @ClassName: Disposable
- * @Description: 可看做 job == disposable
+ * @Description: 可看做 job == Disposable
  * @Author: liyihuan
  * @Date: 2021/8/9 21:47
  */

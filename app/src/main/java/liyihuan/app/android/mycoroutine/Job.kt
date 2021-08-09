@@ -19,6 +19,10 @@ public interface Job : CoroutineContext.Element {
 
     override val key: CoroutineContext.Key<*> get() = Job
 
+    val isActive: Boolean
+
+    val isCompleted: Boolean
+
     suspend fun join()
 
     fun remove(disposable: Disposable)
