@@ -57,14 +57,17 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
     }
 
     private fun doOnCompleted(block: (Result<T>) -> Unit): Disposable {
-        // 把 disposable 和 job 建立联系
+        // 把 disposable 和 job 建立联系，并把joinSuspend 挂起函数的开始方法一起做保存
         val disposable = CompletionHandlerDisposable(this, block)
         // 判断当前job状态
         val newState = state.updateAndGet { oldState ->
             // 拿到调用resumeWith方法时的状态
             when (oldState) {
                 is CoroutineState.InComplete -> {
-                    // 未完成 -->
+                    // 未完成
+                    // 1.CoroutineState.InComplete() --> 新建一个CoroutineState(),默认DisposableList() == null，且作为新State
+                    // 2.from() --> 复制，把旧的State复制一份存放在新State中
+                    // 3.with() --> 向新的State 添加 disposable 并以Bean类 Cons() { head(Disposable)对象 和 tail(disposableList)} 存放
                     CoroutineState.InComplete().from(oldState).with(disposable)
                 }
                 is CoroutineState.Cancelling -> {
@@ -79,6 +82,7 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
 //        newState as? CoroutineState.Complete<T>  --> CoroutineState.Complete<T>?
 //        newState as CoroutineState.Complete<T> --> CoroutineState.Complete<T>
 
+        // 为了给 async 用的，返回一个结果
         (newState as? CoroutineState.Complete<T>)?.let {
             block(
                 when {
@@ -92,7 +96,18 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
     }
 
     override fun remove(disposable: Disposable) {
+        state.updateAndGet { oldState ->
+            when (oldState) {
+                is CoroutineState.InComplete -> {
 
+                    CoroutineState.InComplete().from(oldState).without(disposable)
+                }
+                is CoroutineState.Complete<*> -> oldState
+                is CoroutineState.Cancelling -> {
+                    CoroutineState.Cancelling().from(oldState).without(disposable)
+                }
+            }
+        }
     }
 
     override fun resumeWith(result: Result<T>) {
@@ -101,7 +116,7 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
             // 拿到调用resumeWith方法时的状态
             when (oldState) {
                 is CoroutineState.InComplete -> {
-                    CoroutineState.Complete(result.getOrNull(), result.exceptionOrNull())
+                    CoroutineState.Complete(result.getOrNull(), result.exceptionOrNull()).from(oldState)
                 }
                 is CoroutineState.Cancelling -> {
                     CoroutineState.Cancelling()

@@ -44,7 +44,7 @@ sealed class CoroutineState {
     }
 
 
-    fun clear(){
+    fun clear() {
         this.disposableList = DisposableList.Nil
     }
 

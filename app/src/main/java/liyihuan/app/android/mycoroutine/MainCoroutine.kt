@@ -25,11 +25,8 @@ suspend fun main() {
 }
 
 suspend fun test() = suspendCoroutine<String> { it ->
-
     thread(isDaemon = true) {
         Thread.sleep(1000)
         it.resume("Hello-World")
     }
-
-
 }
