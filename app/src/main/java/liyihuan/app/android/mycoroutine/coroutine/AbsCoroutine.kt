@@ -1,9 +1,6 @@
 package liyihuan.app.android.mycoroutine.coroutine
 
-import liyihuan.app.android.mycoroutine.CompletionHandlerDisposable
-import liyihuan.app.android.mycoroutine.CoroutineState
-import liyihuan.app.android.mycoroutine.Disposable
-import liyihuan.app.android.mycoroutine.Job
+import liyihuan.app.android.mycoroutine.*
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
@@ -35,12 +32,12 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
 
     override suspend fun join() {
         when (state.get()) {
+            is CoroutineState.Cancelling -> {
+                return
+            }
             is CoroutineState.InComplete -> {
                 // 未完成 挂起等待
                 return joinSuspend()
-            }
-            is CoroutineState.Cancelling -> {
-
             }
             is CoroutineState.Complete<*> -> {
                 return
@@ -49,10 +46,16 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
     }
 
 
-    private suspend fun joinSuspend() = suspendCoroutine<Unit> { continuation ->
-        // job 完成后 执行doOnCompleted的闭包？
-        doOnCompleted {
+    /**
+     * 挂起当前job，等待当前挂起函数resume，否则joinSuspend不会恢复
+     */
+    private suspend fun joinSuspend() = suspendCancellableCoroutine<Unit> { continuation ->
+        val disposable = doOnCompleted {
             continuation.resume(Unit)
+        }
+        // 把当前job的onCancel方法存起来
+        continuation.invokeOnCancel {
+            disposable.dispose()
         }
     }
 
@@ -71,7 +74,7 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
                     CoroutineState.InComplete().from(oldState).with(disposable)
                 }
                 is CoroutineState.Cancelling -> {
-                    CoroutineState.Cancelling()
+                    CoroutineState.Cancelling().from(oldState).with(disposable)
                 }
                 is CoroutineState.Complete<*> -> {
                     oldState
@@ -110,17 +113,64 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
         }
     }
 
+
+    override fun cancel() {
+        val newState = state.updateAndGet { oldState ->
+            when (oldState) {
+                is CoroutineState.InComplete -> {
+                    CoroutineState.Cancelling().from(oldState)
+                }
+                is CoroutineState.Complete<*>,
+                is CoroutineState.Cancelling -> {
+                    oldState
+                }
+            }
+        }
+
+        // newState 里面存有当前job的disposableList
+        if (newState is CoroutineState.Cancelling) {
+            newState.notifyCancellation()
+        }
+    }
+
+
+    override fun invokeOnCancel(onCancel: OnCancel): Disposable {
+        val disposable = CancellationHandlerDisposable(this, onCancel)
+        val newState = state.updateAndGet { oldState ->
+            when (oldState) {
+                is CoroutineState.InComplete -> {
+                    CoroutineState.InComplete().from(oldState).with(disposable)
+                }
+                is CoroutineState.Cancelling,
+                is CoroutineState.Complete<*> -> {
+                    oldState
+                }
+            }
+        }
+
+        (newState as? CoroutineState.Cancelling)?.let {
+            onCancel()
+        }
+        return disposable
+    }
+
+    override fun invokeOnCompletion(onComplete: OnComplete): Disposable {
+        return doOnCompleted {
+            onComplete()
+        }
+    }
+
     override fun resumeWith(result: Result<T>) {
         // 根据旧状态扭转成新状态
         val newState = state.updateAndGet { oldState ->
             // 拿到调用resumeWith方法时的状态
             when (oldState) {
+                is CoroutineState.Cancelling,
                 is CoroutineState.InComplete -> {
-                    CoroutineState.Complete(result.getOrNull(), result.exceptionOrNull()).from(oldState)
+                    CoroutineState.Complete(result.getOrNull(), result.exceptionOrNull())
+                        .from(oldState)
                 }
-                is CoroutineState.Cancelling -> {
-                    CoroutineState.Cancelling()
-                }
+
                 is CoroutineState.Complete<*> -> {
                     throw Exception("resumeWith 已经 Complete 过了")
 

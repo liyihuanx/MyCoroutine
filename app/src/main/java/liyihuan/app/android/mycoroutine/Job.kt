@@ -25,5 +25,11 @@ public interface Job : CoroutineContext.Element {
 
     suspend fun join()
 
+    fun invokeOnCompletion(onComplete: OnComplete): Disposable
+
+    fun invokeOnCancel(onCancel: OnCancel): Disposable
+
     fun remove(disposable: Disposable)
+
+    fun cancel()
 }
