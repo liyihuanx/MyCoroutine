@@ -1,10 +1,12 @@
 package liyihuan.app.android.mycoroutine
 
 import liyihuan.app.android.mycoroutine.coroutine.suspendCancellableCoroutine
+import liyihuan.app.android.mycoroutine.scope.CoroutineScope
+import liyihuan.app.android.mycoroutine.scope.GlobalScope
+import liyihuan.app.android.mycoroutine.scope.coroutineScope
 import liyihuan.app.android.mycoroutine.utils.log
 import kotlin.concurrent.thread
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 /**
  * @ClassName: MainCoroutine
@@ -16,7 +18,7 @@ import kotlin.coroutines.suspendCoroutine
 suspend fun main() {
     log("main")
 
-    val jon = launch {
+    val jon = GlobalScope.launch {
         log(1)
         val result = test()
         log(result)

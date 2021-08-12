@@ -1,11 +1,10 @@
 package liyihuan.app.android.mycoroutine
 
-import com.google.gson.Gson
 import liyihuan.app.android.mycoroutine.coroutine.CoroutineName
 import liyihuan.app.android.mycoroutine.coroutine.StandardCoroutine
 import liyihuan.app.android.mycoroutine.dispatch.DispatchSelector
-import liyihuan.app.android.mycoroutine.interceptor.MyContinuationInterceptor
-import liyihuan.app.android.mycoroutine.utils.log
+import liyihuan.app.android.mycoroutine.scope.CoroutineScope
+import liyihuan.app.android.mycoroutine.scope.GlobalScope
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.CoroutineContext
@@ -19,9 +18,9 @@ import kotlin.coroutines.startCoroutine
  * @Date: 2021/8/9 20:38
  */
 
-fun launch(
+fun CoroutineScope.launch(
     context: CoroutineContext = EmptyCoroutineContext,
-    block: suspend () -> Unit
+    block: suspend CoroutineScope.() -> Unit // CoroutineScope里的方法只能在这个闭包中使用){}
 ): Job {
     // 源码
 //    val newContext = newCoroutineContext(context)
@@ -32,13 +31,13 @@ fun launch(
 
     val newContext = newCoroutineContext(context)
     val coroutine = StandardCoroutine(newContext)
-    block.startCoroutine(coroutine)
+    block.startCoroutine(coroutine,coroutine)
     return coroutine
 }
 
 // CoroutineContext == 数据结构
 private var coroutineIndex = AtomicInteger(0)
-fun newCoroutineContext(context: CoroutineContext): CoroutineContext {
+fun CoroutineScope.newCoroutineContext(context: CoroutineContext): CoroutineContext {
     /**
      * coroutineContext{"left":{"key":{},"name":"@coroutine#0"},"element":{"dispatcher":{},"key":{}}}
      * {
@@ -54,7 +53,7 @@ fun newCoroutineContext(context: CoroutineContext): CoroutineContext {
      */
     // "+" 是重载运算符
     val combined =
-        context + CoroutineName("@coroutine#${coroutineIndex.getAndIncrement()}")
+        context + scopeContext + CoroutineName("@coroutine#${coroutineIndex.getAndIncrement()}")
 
     return if (combined !== DispatchSelector.Default && combined[ContinuationInterceptor] == null)
         combined + DispatchSelector.Default  else combined

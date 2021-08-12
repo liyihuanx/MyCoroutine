@@ -1,11 +1,10 @@
 package liyihuan.app.android.mycoroutine.coroutine
 
 import liyihuan.app.android.mycoroutine.*
+import liyihuan.app.android.mycoroutine.exception.CoroutineExceptionHandler
+import liyihuan.app.android.mycoroutine.scope.CoroutineScope
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.*
 
 /**
  * @ClassName: AbsCoroutine
@@ -13,12 +12,16 @@ import kotlin.coroutines.suspendCoroutine
  * @Author: liyihuan
  * @Date: 2021/8/9 20:43
  */
-abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation<T> {
+abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation<T>,
+    CoroutineScope {
 
     // 原子操作,当前协程的状态
     private val state = AtomicReference<CoroutineState>()
 
-    override val context: CoroutineContext = newContext
+    override val context: CoroutineContext = newContext + this
+
+    override val scopeContext: CoroutineContext
+        get() = context
 
     override val isActive: Boolean
         get() = state.get() is CoroutineState.InComplete
@@ -26,8 +29,16 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
     override val isCompleted: Boolean
         get() = state.get() is CoroutineState.Complete<*>
 
+    // 传进来的context会包含父协程,在newCoroutineContext时一起添加进来的
+    protected val parentJob = newContext[Job]
+
+    private var parentCancelDisposable: Disposable? = null
+
     init {
         state.set(CoroutineState.InComplete())
+        parentCancelDisposable = parentJob?.invokeOnCancel {
+            cancel()
+        }
     }
 
     override suspend fun join() {
@@ -40,6 +51,13 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
                 return joinSuspend()
             }
             is CoroutineState.Complete<*> -> {
+                // coroutineContext --> Returns the context of the current coroutine.
+                // 有无当前协程 有判断存活状态，没有直接return
+                val currentCallingJobState = coroutineContext[Job]?.isActive ?: return
+                // isActive == InComplete
+                if (!currentCallingJobState) {
+                    throw CancellationException("Coroutine is cancelled.")
+                }
                 return
             }
         }
@@ -131,6 +149,8 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
         if (newState is CoroutineState.Cancelling) {
             newState.notifyCancellation()
         }
+
+        parentCancelDisposable?.dispose()
     }
 
 
@@ -181,12 +201,50 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
         // 扭转的新状态 --> 已完成
         // 判断是否有异常。
         (newState as CoroutineState.Complete<T>).exception?.let {
-
+            tryHandleException(it)
         }
         // 更新
         newState.notifyCompletion(result)
         newState.clear()
 
+        parentCancelDisposable?.dispose()
+
+    }
+
+    /**
+     * 有异常,想给父job处理，不处理的话再由自己处理
+     */
+    private fun tryHandleException(exception: Throwable): Boolean {
+        return when (exception) {
+            is CancellationException -> false
+            else -> {
+                // (xxx)? return (true or false).takeIf{ } --> 如果为false就handleJobExp
+                (parentJob as? AbsCoroutine<*>)?.handleChildException(exception)?.takeIf { it }
+                    ?: handleJobException(exception)
+            }
+        }
+    }
+
+    protected open fun handleChildException(exception: Throwable): Boolean {
+        cancel()
+        return tryHandleException(exception)
+    }
+
+
+    // 返回true表示已经处理过异常了
+    protected open fun handleJobException(e: Throwable): Boolean {
+        val coroutineExceptionHandler = context[CoroutineExceptionHandler.Key]
+        //
+        coroutineExceptionHandler?.handleException(context, e)
+            ?: Thread.currentThread().let {
+                it.uncaughtExceptionHandler.uncaughtException(it, e)
+            }
+        return true
+    }
+
+
+    override fun toString(): String {
+        return "${context[CoroutineName]?.name}"
     }
 }
 
