@@ -43,9 +43,7 @@ abstract class AbsCoroutine<T>(newContext: CoroutineContext) : Job, Continuation
 
     override suspend fun join() {
         when (state.get()) {
-            is CoroutineState.Cancelling -> {
-                return
-            }
+            is CoroutineState.Cancelling,
             is CoroutineState.InComplete -> {
                 // 未完成 挂起等待
                 return joinSuspend()

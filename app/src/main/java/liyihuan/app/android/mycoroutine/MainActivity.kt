@@ -4,8 +4,10 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import kotlinx.coroutines.*
 import liyihuan.app.android.mycoroutine.utils.log
+import java.lang.Exception
 import kotlin.concurrent.thread
 import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -16,16 +18,35 @@ class MainActivity : AppCompatActivity() {
 
 suspend fun main() {
 
-    val job = GlobalScope.launch {
-        log("发起网络请求")
-        val test1 = test1()
-        log("网络请求返回结果$test1")
+//    val job = GlobalScope.launch {
+//        log("发起网络请求")
+//        val test1 = test1()
+//        log("网络请求返回结果$test1")
+//    }
+//    kotlinx.coroutines.delay(100)
+//    log("关闭了页面，取消网络求情")
+//    job.cancel()
+//    job.join()
+//    kotlinx.coroutines.delay(2000)
+
+
+    val job1 = GlobalScope.launch {
+        log(1)
+        kotlinx.coroutines.delay(2000)
+        val job2 = GlobalScope.launch {
+            throw ArithmeticException("11")
+        }
+
+        val job3 = GlobalScope.launch {
+            log(2)
+        }
+
+        log(3)
     }
-    kotlinx.coroutines.delay(100)
-    log("关闭了页面，取消网络求情")
-    job.cancel()
-    job.join()
+
+    job1.join()
     kotlinx.coroutines.delay(2000)
+
 
 }
 

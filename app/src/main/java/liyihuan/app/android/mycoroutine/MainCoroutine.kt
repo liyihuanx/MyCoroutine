@@ -1,12 +1,11 @@
 package liyihuan.app.android.mycoroutine
 
 import liyihuan.app.android.mycoroutine.coroutine.suspendCancellableCoroutine
-import liyihuan.app.android.mycoroutine.scope.CoroutineScope
 import liyihuan.app.android.mycoroutine.scope.GlobalScope
-import liyihuan.app.android.mycoroutine.scope.coroutineScope
 import liyihuan.app.android.mycoroutine.utils.log
 import kotlin.concurrent.thread
 import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 /**
  * @ClassName: MainCoroutine
@@ -17,27 +16,23 @@ import kotlin.coroutines.resume
 
 suspend fun main() {
     log("main")
-
-    val jon = GlobalScope.launch {
-        log(1)
-        val result = test()
-        log(result)
-//        delay(2000)
-        log(2)
+     val job = GlobalScope.launch {
+        log("发起网络请求")
+        val test1 = testJava()
+        log("网络请求返回结果$test1")
     }
-
-    delay(100)
-    jon.cancel()
-    jon.join()
-    log(3)
     delay(200)
-    log(4)
+    log("关闭了页面，取消网络求情")
+    job.cancel()
+    job.join()
+    delay(200)
+
 
 }
 
 suspend fun test() = suspendCancellableCoroutine<String> { it ->
     thread(isDaemon = true) {
-        Thread.sleep(200)
+        Thread.sleep(300)
         it.resume("Hello-World")
     }
 }
