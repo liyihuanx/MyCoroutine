@@ -18,7 +18,7 @@ suspend fun main() {
     log("main")
      val job = GlobalScope.launch {
         log("发起网络请求")
-        val test1 = testJava()
+        val test1 = test()
         log("网络请求返回结果$test1")
     }
     delay(200)
