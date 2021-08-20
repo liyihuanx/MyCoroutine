@@ -4,8 +4,7 @@ import liyihuan.app.android.mycoroutine.coroutine.suspendCancellableCoroutine
 import liyihuan.app.android.mycoroutine.scope.GlobalScope
 import liyihuan.app.android.mycoroutine.utils.log
 import kotlin.concurrent.thread
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.*
 
 /**
  * @ClassName: MainCoroutine
@@ -28,7 +27,29 @@ suspend fun main() {
     delay(200)
 
 
+
+
+    val suspend = suspend {
+        "11"
+    }
+
+    val createCoroutine = suspend.createCoroutine(
+        object : Continuation<String> {
+            override val context: CoroutineContext
+                get() = EmptyCoroutineContext
+
+            override fun resumeWith(result: Result<String>) {
+                log(result.getOrNull())
+            }
+        }
+    )
+    
+
+    createCoroutine.resume(Unit)
+
 }
+
+
 
 suspend fun test() = suspendCancellableCoroutine<String> { it ->
     thread(isDaemon = true) {
